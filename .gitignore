@@ -1,0 +1,29 @@
+# Ignore the virtual environment folder
+venv/
+
+# Ignore Python compiled files
+*.pyc
+__pycache__/
+
+# Ignore environment variables file
+.env
+
+# Ignore SQLite database files
+*.db
+
+# Ignore system files (Mac OS, Windows, Linux)
+.DS_Store
+Thumbs.db
+*.swp
+
+# Ignore logs
+*.log
+
+# Ignore coverage reports
+htmlcov/
+.coverage
+
+# Ignore IDE-specific files (if you're using any IDE)
+.vscode/
+.idea/
+
