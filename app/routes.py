@@ -3,26 +3,22 @@ import uuid
 from flask import Flask, session,render_template,request, Response, redirect, send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
-from database import db_init, db
+from database import create_app, db
 from models import  User, Product
 from datetime import datetime
 from flask_session import Session
 from help import login_required
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///items.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fastshop.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db_init(app)
+create_app(app)
 
 # Configure session to use filesystem
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-#static file path
-@app.route("/static/<path:path>")
-def static_dir(path):
-    return send_from_directory("static", path)
 
 #signup as merchant
 @app.route("/signup", methods=["GET","POST"])
