@@ -8,6 +8,7 @@ from models import  User, Product
 from datetime import datetime
 from flask_session import Session
 from help import login_required
+from flask import jsonify, request
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fastshop.db'
@@ -19,31 +20,40 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-
-#signup as merchant
-@app.route("/signup", methods=["GET","POST"])
+#signup 
+@app.route("/signup", methods=["POST"])
 def signup():
-	if request.method=="POST":
-		session.clear()
-		password = request.form.get("password")
-		repassword = request.form.get("repassword")
-		if(password!=repassword):
-			return render_template("error.html", message="Passwords do not match!")
+    if request.method == "POST":
+        # Clear any existing session
+        session.clear()
 
-		#hash password
-		pw_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
-		
-		fullname = request.form.get("fullname")
-		username = request.form.get("username")
-		#store in database
-		new_user =User(fullname=fullname,username=username,password=pw_hash)
-		try:
-			db.session.add(new_user)
-			db.session.commit()
-		except:
-			return render_template("error.html", message="Username already exists!")
-		return render_template("login.html", msg="Account created!")
-	return render_template("signup.html")
+        # Get passwords from the request JSON body (instead of form data)
+        data = request.get_json()
+        password = data.get("password")
+        confirmpassword = data.get("confirmpassword")
+
+        # Check if passwords match
+        if password != confirmpassword:
+            return jsonify({"error": "Passwords do not match!"}), 400
+
+        # Hash the passw
+        pw_hash = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+
+        # Get other signup data
+        fullname = data.get("fullname")
+        email = data.get("email")
+
+        # Store new user in the database
+        new_user = User(fullname=fullname, email=email, password=pw_hash)
+        try:
+            db.session.add(new_user)
+            db.session.commit()
+        except:
+            return jsonify({"error": "User already exists!"}), 409
+
+        # Return success message as JSON
+        return jsonify({"message": "Account created!"}), 201
+
 
 #login as merchant
 @app.route("/login", methods=["GET", "POST"])
