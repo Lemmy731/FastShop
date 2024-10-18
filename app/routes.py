@@ -56,77 +56,100 @@ def signup():
 
 
 #login as merchant
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["POST"])
 def login():
-	if request.method=="POST":
-		session.clear()
-		username = request.form.get("username")
-		password = request.form.get("password")
-		result = User.query.filter_by(username=username).first()
-		print(result)
-		# Ensure username exists and password is correct
-		if result == None or not check_password_hash(result.password, password):
-			return render_template("error.html", message="Invalid username and/or password")
-		# Remember which user has logged in
-		session["username"] = result.username
-		return redirect("/home")
-	return render_template("login.html")
+    # Clear any existing session
+    session.clear()
+
+    # Get the username and password from the request body (JSON)
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    # Query the database to find the user by username
+    result = User.query.filter_by(email=email).first()
+
+    # Ensure the user exists and the password is correct
+    if result is None or not check_password_hash(result.password, password):
+        return jsonify({"error": "Invalid email and/or password"}), 401
+
+    # Store the username in the session (user is logged in)
+    session["email"] = result.email
+
+    # Respond with a success message
+    return jsonify({"message": "Login successful", "email": result.email}), 200
+
 
 #logout
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 def logout():
-	session.clear()
-	return redirect("/login")
+    # Clear the session to log the user out
+    session.clear()
 
-#view all products
-@app.route("/")
-def index():
-	rows = Product.query.all()
-	return render_template("index.html", rows=rows)
+    # Return a JSON response indicating the user is logged out
+    return jsonify({"message": "Successfully logged out"}), 200
 
-#merchant home page to add new products and edit existing products
-@app.route("/home", methods=["GET", "POST"], endpoint='home')
-@login_required
-def home():
-	if request.method == "POST":
-		image = request.files['image']
-		filename = str(uuid.uuid1())+os.path.splitext(image.filename)[1]
-		image.save(os.path.join("static/images", filename))
-		category= request.form.get("category")
-		name = request.form.get("pro_name")
-		description = request.form.get("description")
-		price_range = request.form.get("price_range")
-		comments = request.form.get("comments")
-		new_pro = Product(category=category,name=name,description=description,price_range=price_range,comments=comments, filename=filename, username=session['username'])
-		db.session.add(new_pro)
-		db.session.commit()
-		rows = Product.query.filter_by(username=session['username'])
-		return render_template("home.html", rows=rows, message="Product added")
-	
-	rows = Product.query.filter_by(username=session['username'])
-	return render_template("home.html", rows=rows)
 
-#when edit product option is selected this function is loaded
-@app.route("/edit/<int:pro_id>", methods=["GET", "POST"], endpoint='edit')
-@login_required
-def edit(pro_id):
-	#select only the editing product from db
-	result = Product.query.filter_by(pro_id = pro_id).first()
-	if request.method == "POST":
-		#throw error when some merchant tries to edit product of other merchant
-		if result.username != session['username']:
-			return render_template("error.html", message="You are not authorized to edit this product")
-		category= request.form.get("category")
-		name = request.form.get("pro_name")
-		description = request.form.get("description")
-		price_range = request.form.get("price_range")
-		comments = request.form.get("comments")
-		result.category = category
-		result.name = name
-		result.description = description
-		result.comments = comments
-		result.price_range = price_range
-		db.session.commit()
-		rows = Product.query.filter_by(username=session['username'])
-		return render_template("home.html", rows=rows, message="Product edited")
-	return render_template("edit.html", result=result)
+#get all products
+@app.route("/products", methods=["GET"])
+def get_all_products():
+    # Query all products from the database
+    products = Product.query.all()
+
+    # Convert products into a list of dictionaries
+    products_list = [
+        {
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "description": product.description
+        } for product in products
+    ]
+
+    # Return the products as JSON
+    return jsonify(products_list), 200
+
+
+
+#add product
+@app.route("/products", methods=["POST"])
+def add_product():
+    # Get the data from the request body (assumes JSON is sent)
+    data = request.get_json()
+
+    # Extract product details from the JSON data
+    name = data.get("name")
+    price = data.get("price")
+    description = data.get("description")
+
+    # Validate the required fields
+    if not name or not price:
+        return jsonify({"error": "Name and price are required fields"}), 400
+
+    # Create a new product object
+    new_product = Product(
+        name=name,
+        price=price,
+        description=description
+    )
+
+    # Add the new product to the database
+    try:
+        db.session.add(new_product)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()  # Roll back the transaction in case of an error
+        return jsonify({"error": "Could not add product", "details": str(e)}), 500
+
+    # Return a success response with the product details
+    return jsonify({
+        "message": "Product added successfully",
+        "product": {
+            "id": new_product.id,
+            "name": new_product.name,
+            "price": new_product.price,
+            "description": new_product.description
+        }
+    }), 201  # 201 status code for resource creation
+
+
