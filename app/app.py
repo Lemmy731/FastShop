@@ -79,14 +79,11 @@ def login():
         return jsonify({"error": "Invalid email or password"}), 401
 
 
-#logout
+# Logout
 @app.route("/logout", methods=["POST"])
 def logout():
-    # Clear the session to log the user out
-    session.clear()
-
-    # Return a JSON response indicating the user is logged out
-    return jsonify({"message": "Successfully logged out"}), 200
+    # Inform the client to discard the token
+    return jsonify({"message": "Token invalidated. Please discard your access token."}), 200
 
 
 #get all products
