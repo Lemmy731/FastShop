@@ -109,10 +109,29 @@ def get_all_products():
     # Return the products as JSON
     return jsonify(products_list), 200
 
+#get product by id
+@app.route("/products/<int:id>", methods=["GET"])
+@jwt_required()
+def get_product(product_id):
+    # Query the database for the product with the specified ID
+    product = Product.query.get(id)
+
+    if product:
+        # Return product details as JSON if found
+        return jsonify({
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "description": product.description
+        }), 200
+    else:
+        # Return an error message if the product is not found
+        return jsonify({"error": "Product not found"}), 404
 
 
 #add product
 @app.route("/products", methods=["POST"])
+@jwt_required()
 def add_product():
     # Get the data from the request body (assumes JSON is sent)
     data = request.get_json()
@@ -154,6 +173,7 @@ def add_product():
 
 #update product by id
 @app.route("/product/<int:id>", methods=["PUT"])
+@jwt_required()
 def update_product(id):
     # Get the updated product data from the request
     data = request.get_json()
@@ -196,6 +216,7 @@ def update_product(id):
 
 #delete product
 @app.route("/product/<int:id>", methods=["DELETE"])
+@jwt_required()
 def delete_product(id):
     # Fetch the product by id from the database
     product = Product.query.get(id)
