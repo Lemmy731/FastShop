@@ -1,6 +1,6 @@
 import os
 import uuid
-from flask import Flask, session,render_template,request, Response, redirect, send_from_directory
+from flask import Flask, session,request, Response, send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash, generate_password_hash
 from database import create_app, db
@@ -61,19 +61,19 @@ def login():
     # Clear any existing session
     session.clear()
 
-    # Get the username and password from the request body (JSON)
+    # Get the user email and password from the request body (JSON)
     data = request.get_json()
     email = data.get("email")
     password = data.get("password")
 
-    # Query the database to find the user by username
+    # Query the database to find the user by email
     result = User.query.filter_by(email=email).first()
 
     # Ensure the user exists and the password is correct
     if result is None or not check_password_hash(result.password, password):
         return jsonify({"error": "Invalid email and/or password"}), 401
 
-    # Store the username in the session (user is logged in)
+    # Store the user email in the session (user is logged in)
     session["email"] = result.email
 
     # Respond with a success message
@@ -151,5 +151,46 @@ def add_product():
             "description": new_product.description
         }
     }), 201  # 201 status code for resource creation
+
+#update product by id
+@app.route("/product/<int:id>", methods=["PUT"])
+def update_product(id):
+    # Get the updated product data from the request
+    data = request.get_json()
+
+    # Fetch the product by id from the database
+    product = Product.query.get(id)
+
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+
+    # Extract updated values from the request 
+    name = data.get("name")
+    price = data.get("price")
+    description = data.get("description")
+
+    # Update product fields only if provided
+    if name:
+        product.name = name
+    if price:
+        product.price = price
+    if description:
+        product.description = description
+
+    try:
+        # Commit the changes to the database
+        db.session.commit()
+        return jsonify({
+            "message": "Product updated successfully",
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "price": product.price,
+                "description": product.description
+            }
+        }), 200  # 200 indicates a successful update
+    except Exception as e:
+        db.session.rollback()  # Rollback the transaction if something goes wrong
+        return jsonify({"error": str(e)}), 500  # Internal server error
 
 
