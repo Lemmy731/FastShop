@@ -6,31 +6,37 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from database import create_app, db
 from models import  User, Product
 from datetime import datetime
-from flask_session import Session
-from help import login_required
 from flask import jsonify, request
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
+
+#database config
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///fastshop.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 create_app(app)
 
-# Configure session to use filesystem
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
+#jwt
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(hours=1)
+
+jwt = JWTManager(app)
+
+
 
 #signup 
 @app.route("/signup", methods=["POST"])
 def signup():
     if request.method == "POST":
-        # Clear any existing session
-        session.clear()
-
-        # Get passwords from the request JSON body (instead of form data)
+      
+        # Get passwords from the request JSON body 
         data = request.get_json()
         password = data.get("password")
-        confirmpassword = data.get("confirmpassword")
+        confirmpassword = data.get("confirmpassword") # do i need confirm pass
 
         # Check if passwords match
         if password != confirmpassword:
@@ -41,10 +47,11 @@ def signup():
 
         # Get other signup data
         fullname = data.get("fullname")
+        username = data.get("username")
         email = data.get("email")
 
         # Store new user in the database
-        new_user = User(fullname=fullname, email=email, password=pw_hash)
+        new_user = User(fullname=fullname, username = username, email=email, password=pw_hash)
         try:
             db.session.add(new_user)
             db.session.commit()
@@ -55,29 +62,21 @@ def signup():
         return jsonify({"message": "Account created!"}), 201
 
 
-#login as merchant
+#login 
 @app.route("/login", methods=["POST"])
 def login():
-    # Clear any existing session
-    session.clear()
-
-    # Get the user email and password from the request body (JSON)
     data = request.get_json()
     email = data.get("email")
     password = data.get("password")
-
-    # Query the database to find the user by email
-    result = User.query.filter_by(email=email).first()
-
-    # Ensure the user exists and the password is correct
-    if result is None or not check_password_hash(result.password, password):
-        return jsonify({"error": "Invalid email and/or password"}), 401
-
-    # Store the user email in the session (user is logged in)
-    session["email"] = result.email
-
-    # Respond with a success message
-    return jsonify({"message": "Login successful", "email": result.email}), 200
+    
+    user = User.query.filter_by(email=email).first()
+    
+    if user and check_password_hash(user.password, password):
+        # Create a new token
+        token = create_access_token(identity=user.username)
+        return jsonify(access_token=token), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
 
 
 #logout
@@ -92,6 +91,7 @@ def logout():
 
 #get all products
 @app.route("/products", methods=["GET"])
+@jwt_required()
 def get_all_products():
     # Query all products from the database
     products = Product.query.all()
@@ -192,5 +192,28 @@ def update_product(id):
     except Exception as e:
         db.session.rollback()  # Rollback the transaction if something goes wrong
         return jsonify({"error": str(e)}), 500  # Internal server error
+    
+
+#delete product
+@app.route("/product/<int:id>", methods=["DELETE"])
+def delete_product(id):
+    # Fetch the product by id from the database
+    product = Product.query.get(id)
+
+    # Check if product exists
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+
+    try:
+        # Delete the product from the database
+        db.session.delete(product)
+        db.session.commit()
+
+        # Return success response
+        return jsonify({"message": "Product deleted successfully"}), 200
+    except Exception as e:
+        db.session.rollback()  # Rollback if something goes wrong
+        return jsonify({"error": str(e)}), 500  # Return server error
+
 
 
