@@ -2,8 +2,8 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from models import db
 from config import DevelopmentConfig
-from auth import auth_bp  #auth routes
-from product import product_blueprint  # Product CRUD routes
+from auth import auth_bp  
+from product import product_blueprint 
 
 app = Flask(__name__)
 
